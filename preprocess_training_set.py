@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 import collections
 import time
 
@@ -156,6 +157,7 @@ def preprocess():
     list_price_x_rfq_qty_n = list_price_x_rfq_qty_n
     rfq_price_x_order_qty_n = rfq_price_x_order_qty_n
 
+    # concatenate all encoded and normalized arrays
     X = np.concatenate((country_b, coverage_b), axis=1)
     X = np.concatenate((X, sku_b), axis=1)
     X = np.concatenate((X, sku_category_b), axis=1)
@@ -165,6 +167,16 @@ def preprocess():
     X = np.concatenate((X, rfq_price_n), axis=1)
     X = np.concatenate((X, list_price_x_rfq_qty_n), axis=1)
     X = np.concatenate((X, rfq_price_x_order_qty_n), axis=1)
+
+    # split into train&cv and test sets
+    test_size = 0.3
+    X_train_and_cv, X_test, y_train_and_cv, y_test = train_test_split(X, y, test_size=test_size)
+
+    # split into train and cv sets
+    cv_size = 0.2
+    X_train, X_cv, y_train, y_cv = train_test_split(X_train_and_cv,
+                                                    y_train_and_cv,
+                                                    test_size=cv_size)
 
     # # compute percentage of each key
     # for i in range(0, len(keys_order_qty)):
@@ -223,6 +235,4 @@ def preprocess():
 
     print('\nPREPROCESSING COMPLETE\nTime elapsed: {:.2f} {}'.format((end - start), 'seconds'))
 
-    return X, y
-
-# preprocess()
+    return X_train, X_cv, X_test, y_train, y_cv, y_test

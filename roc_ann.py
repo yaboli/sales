@@ -3,55 +3,56 @@ import matplotlib.pyplot as plt
 from itertools import cycle
 
 from keras.models import load_model
-from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from preprocess_training_set import preprocess
 from sklearn.preprocessing import label_binarize
 from scipy import interp
 
 
-X, y = preprocess()
-
-# split into train&cv and test sets
-test_size = 0.3
-X_train_and_cv, X_test, y_train_and_cv, y_test = train_test_split(X, y, test_size=test_size)
-
-# split into train and cv sets
-cv_size = 0.2
-X_train, X_cv, y_train, y_cv = train_test_split(X_train_and_cv,
-                                                y_train_and_cv,
-                                                test_size=cv_size)
+_, X_cv, X_test, _, y_cv, y_test = preprocess()
 
 n_classes = 2
 y_b = label_binarize(y_cv, range(n_classes+1))[:, :-1]
 
 model = load_model('model_ann.h5')
 
-y_pred = model.predict(X_cv)
-y_pred_prob = np.zeros((len(y_pred), 2))
+# results for validation sets
+y_pred_cv = model.predict(X_cv)
+y_pred_prob_cv = np.zeros((len(y_pred_cv), 2))
 
 # construct probability matrix
-for i in range(0, len(y_pred)):
-    y_pred_prob[i][0] = 1 - y_pred[i]
-    y_pred_prob[i][1] = y_pred[i]
+for i in range(0, len(y_pred_cv)):
+    y_pred_prob_cv[i][0] = 1 - y_pred_cv[i]
+    y_pred_prob_cv[i][1] = y_pred_cv[i]
 
-print('\nProbability matrix: ')
-print(y_pred_prob)
+rounded_cv = [round(x[0]) for x in y_pred_cv]
+print("\nModel Report: ")
+print("\nAccuracy (validation) : %.4g" % metrics.accuracy_score(y_cv, rounded_cv))
+print("Log Loss (validation): %f" % metrics.log_loss(y_cv, y_pred_prob_cv))
 
-rounded = [round(x[0]) for x in y_pred]
-print("\nAccuracy (validation) : %.4g" % metrics.accuracy_score(y_cv, rounded))
+# results for test sets
+y_pred_test = model.predict(X_test)
+y_pred_prob_test = np.zeros((len(y_pred_test), 2))
 
+# construct probability matrix
+for i in range(0, len(y_pred_test)):
+    y_pred_prob_test[i][0] = 1 - y_pred_test[i]
+    y_pred_prob_test[i][1] = y_pred_test[i]
+
+rounded_test = [round(x[0]) for x in y_pred_test]
+print("\nAccuracy (test) : %.4g" % metrics.accuracy_score(y_test, rounded_test))
+print("Log Loss (test): %f" % metrics.log_loss(y_test, y_pred_prob_test))
 
 # Compute ROC curve and ROC area for each class
 fpr = dict()
 tpr = dict()
 roc_auc = dict()
 for i in range(n_classes):
-    fpr[i], tpr[i], _ = metrics.roc_curve(y_b[:, i], y_pred_prob[:, i])
+    fpr[i], tpr[i], _ = metrics.roc_curve(y_b[:, i], y_pred_prob_cv[:, i])
     roc_auc[i] = metrics.auc(fpr[i], tpr[i])
 
 # Compute micro-average ROC curve and ROC area
-fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_b.ravel(), y_pred_prob.ravel())
+fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_b.ravel(), y_pred_prob_cv.ravel())
 roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
 
 # First aggregate all false positive rates
