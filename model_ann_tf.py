@@ -60,9 +60,9 @@ tf.summary.histogram('w_h2_summ', weights['h2'])
 tf.summary.histogram('w_out_summ', weights['out'])
 
 # Add histogram summaries for biases
-tf.summary.histogram('w_h1_summ', biases['b1'])
-tf.summary.histogram('w_h2_summ', biases['b2'])
-tf.summary.histogram('w_out_summ', biases['out'])
+tf.summary.histogram('b_h1_summ', biases['b1'])
+tf.summary.histogram('b_h2_summ', biases['b2'])
+tf.summary.histogram('b_out_summ', biases['out'])
 
 
 def neural_net_model(x):
@@ -125,8 +125,8 @@ with tf.Session() as sess:
             # Compute average loss
             avg_cost += c / total_batch
         # Record train set summary per epoch step
-        summary = sess.run([merged], feed_dict={X: X_train,
-                                                Y: y_train})
+        summary = sess.run(merged, feed_dict={X: X_train,
+                                              Y: y_train})
         train_writer.add_summary(summary, epoch)
         # Display logs per epoch step
         if epoch % display_step == 0:
