@@ -6,11 +6,49 @@ from sklearn.model_selection import train_test_split
 import collections
 import time
 
+path = 'D:/'
+file_name = 'data.csv'
+
+
+def encode_one_hot(column, num):
+    top_n_tuple = collections.Counter(column).most_common(num)
+    top_n = []
+    # add category to the list
+    for tup in top_n_tuple:
+        top_n.append(tup[0])
+    # update column
+    for i in range(0, len(column)):
+        if column[i] not in top_n:
+            column[i] = 'other'
+    # encode column using one-hot encoding
+    le = LabelEncoder()
+    labels = le.fit_transform(column)
+    encoded = np.zeros((len(column), num + 1), dtype=int)
+    encoded[np.arange(len(column), dtype=int), labels] = 1
+    return encoded
+
+
+def tobits(s):
+    result = []
+    for c in s:
+        bits = bin(ord(c))[2:]
+        bits = '00000000'[len(bits):] + bits
+        result.extend([int(b) for b in bits])
+    return result
+
+
+def encode_ascii(column):
+    encoded = []
+    for value in column:
+        new_value = tobits(value)
+        # deal with the case in sku_category when value has 4 chars
+        if len(new_value) == 32:
+            new_value = [0, 0, 0, 0, 0, 0, 0, 0] + new_value
+        encoded.append(new_value)
+    return encoded
+
 
 def preprocess():
-
-    path = 'D:/'
-    file_name = 'data.csv'
 
     start = time.time()
 
@@ -34,20 +72,11 @@ def preprocess():
     # extract 'Country' column
     countries = data['Country'].values
     # compute frequency of each country
+    top_countries = 27
     dict_country = dict(collections.Counter(countries))
     keys_country = list(dict_country.keys())
-    top_3_countries = collections.Counter(countries).most_common(3)
-    # print(top_3_countries)
-    for i in range(0, len(countries)):
-        country = countries[i]
-        if country != 'US' and country != 'SA' and country != 'QA':
-            countries[i] = 'other'
-    # one-hot encode 'Country'
-    le_country = LabelEncoder()
-    labels_country = le_country.fit_transform(countries)
-    country_b = np.zeros((len(countries), 4), dtype=int)
-    country_b[np.arange(len(countries), dtype=int), labels_country] = 1
-    # print(country_b)
+    country_enc = encode_one_hot(countries, top_countries)
+    # country_enc = encode_ascii(countries)
 
     # extract 'Coverage' column
     coverage = data['Coverage'].values
@@ -56,45 +85,26 @@ def preprocess():
     # one-hot encode 'Coverage'
     le_coverage = LabelEncoder()
     labels_coverage = le_coverage.fit_transform(coverage)
-    coverage_b = np.zeros((len(coverage), 2), dtype=int)
-    coverage_b[np.arange(len(coverage), dtype=int), labels_coverage] = 1
-    # print(coverage_b)
+    coverage_enc = np.zeros((len(coverage), 2), dtype=int)
+    coverage_enc[np.arange(len(coverage), dtype=int), labels_coverage] = 1
 
     # extract 'SKU' column
     skus = [str(i) for i in data['SKU'].values]
     # compute frequency of each SKU
     dict_sku = dict(collections.Counter(skus))
     keys_sku = list(dict_sku.keys())
-    top_5_skus = collections.Counter(skus).most_common(5)
-    # print(top_5_skus)
-    for i in range(0, len(skus)):
-        sku = skus[i]
-        if sku != '10070735' and sku != '10019577' and sku != '10108817' and sku != '10106342' and sku != '10064539':
-            skus[i] = 'other'
-    # one-hot encode 'SKU'
-    le_sku = LabelEncoder()
-    labels_sku = le_sku.fit_transform(skus)
-    sku_b = np.zeros((len(skus), 6), dtype=int)
-    sku_b[np.arange(len(skus), dtype=int), labels_sku] = 1
-    # print(sku_b)
+    top_skus = 150
+    sku_enc = encode_one_hot(skus, top_skus)
+    # sku_enc = encode_ascii(skus)
 
     # extract 'SKU_Category' column
     sku_categories = [str(i) for i in data['SKU_Category'].values]
     # compute frequency of each SKU category
     dict_sku_category = dict(collections.Counter(sku_categories))
     keys_sku_category = list(dict_sku_category.keys())
-    top_5_sku_categories = collections.Counter(sku_categories).most_common(5)
-    # print(top_5_sku_categories)
-    for i in range(0, len(sku_categories)):
-        sku_category = sku_categories[i]
-        if sku_category != '33346' and sku_category != '10322' and sku_category != '14345' and sku_category != '10321' and sku_category != '14382':
-            sku_categories[i] = 'other'
-    # one-hot encode 'SKU_Category'
-    le_sku_category = LabelEncoder()
-    labels_sku_category = le_sku_category.fit_transform(sku_categories)
-    sku_category_b = np.zeros((len(sku_categories), 6), dtype=int)
-    sku_category_b[np.arange(len(sku_categories), dtype=int), labels_sku_category] = 1
-    # print(sku_category_b)
+    top_sku_categories = 30
+    sku_category_enc = encode_one_hot(sku_categories, top_sku_categories)
+    # sku_category_enc = encode_ascii(sku_categories)
 
     # extract 'EB_Flag' column
     eb_flag = data['EB_Flag'].values
@@ -104,9 +114,8 @@ def preprocess():
     # one-hot encode 'EB_Flag'
     le_eb_flag = LabelEncoder()
     labels_eb_flag = le_eb_flag.fit_transform(eb_flag)
-    eb_flag_b = np.zeros((len(eb_flag), 2), dtype=int)
-    eb_flag_b[np.arange(len(eb_flag), dtype=int), labels_eb_flag] = 1
-    # print(eb_flag_b)
+    eb_flag_enc = np.zeros((len(eb_flag), 2), dtype=int)
+    eb_flag_enc[np.arange(len(eb_flag), dtype=int), labels_eb_flag] = 1
 
     # extract 'RFQ_TYPE' column
     rfq_type = [str(i) for i in data['RFQ_TYPE'].values]
@@ -116,57 +125,37 @@ def preprocess():
     # One-hot encode RFQ_Type
     le_rfq_type = LabelEncoder()
     labels_rfq_type = le_rfq_type.fit_transform(rfq_type)
-    rfq_type_b = np.zeros((len(rfq_type), 9), dtype=int)
-    rfq_type_b[np.arange(len(rfq_type), dtype=int), labels_rfq_type] = 1
+    rfq_type_enc = np.zeros((len(rfq_type), 9), dtype=int)
+    rfq_type_enc[np.arange(len(rfq_type), dtype=int), labels_rfq_type] = 1
 
     # extract 'List_Price' column
     list_price = data['List_Price'].values
-    # scale data to the [0, 1] range
+    # scale data to [0, 1]
     min_max_scaler = MinMaxScaler()
-    list_price_n = np.array(min_max_scaler.fit_transform(np.array(list_price).reshape(-1, 1)))
+    list_price_norm = np.array(min_max_scaler.fit_transform(np.array(list_price).reshape(-1, 1)))
 
     # extract 'RFQ_Price' column
     rfq_price = data['RFQ_Price'].values
-    # scale data to the [0, 1] range
+    # scale data to [0, 1]
     min_max_scaler = MinMaxScaler()
-    rfq_price_n = np.array(min_max_scaler.fit_transform(np.array(rfq_price).reshape(-1, 1)))
-    # print(rfq_price_n)
+    rfq_price_norm = np.array(min_max_scaler.fit_transform(np.array(rfq_price).reshape(-1, 1)))
 
-    # extract 'List_Price*RFQ_Qty' column
-    list_price_x_rfq_qty = data['List_Price*RFQ_Qty'].values
-    # scale data to the [0, 1] range
-    min_max_scaler = MinMaxScaler()
-    list_price_x_rfq_qty_n = np.array(min_max_scaler.fit_transform(np.array(list_price_x_rfq_qty).reshape(-1, 1)))
-    # print(list_price_x_rfq_qty_n)
-
-    # extract 'RFQ_Price*Order_Qty' column
-    rfq_price_x_order_qty = data['RFQ_Price*Order_Qty'].values
-    # scale data to the [0, 1] range
-    min_max_scaler = MinMaxScaler()
-    rfq_price_x_order_qty_n = np.array(min_max_scaler.fit_transform(np.array(rfq_price_x_order_qty).reshape(-1, 1)))
-    # print(rfq_price_x_order_qty_n)
-
-    country_b = np.array(country_b)
-    coverage_b = np.array(coverage_b)
-    sku_b = np.array(sku_b)
-    sku_category_b = np.array(sku_category_b)
-    eb_flag_b = np.array(eb_flag_b)
-    rfq_type_b = np.array(rfq_type_b)
-    list_price_n = list_price_n
-    rfq_price_n = rfq_price_n
-    list_price_x_rfq_qty_n = list_price_x_rfq_qty_n
-    rfq_price_x_order_qty_n = rfq_price_x_order_qty_n
+    country_enc = np.array(country_enc)
+    coverage_enc = np.array(coverage_enc)
+    sku_enc = np.array(sku_enc)
+    sku_category_enc = np.array(sku_category_enc)
+    eb_flag_enc = np.array(eb_flag_enc)
+    rfq_type_enc = np.array(rfq_type_enc)
 
     # concatenate all encoded and normalized arrays
-    X = np.concatenate((country_b, coverage_b), axis=1)
-    X = np.concatenate((X, sku_b), axis=1)
-    X = np.concatenate((X, sku_category_b), axis=1)
-    X = np.concatenate((X, eb_flag_b), axis=1)
-    X = np.concatenate((X, rfq_type_b), axis=1)
-    X = np.concatenate((X, list_price_n), axis=1)
-    X = np.concatenate((X, rfq_price_n), axis=1)
-    X = np.concatenate((X, list_price_x_rfq_qty_n), axis=1)
-    X = np.concatenate((X, rfq_price_x_order_qty_n), axis=1)
+    X = np.concatenate((country_enc, coverage_enc), axis=1)
+    X = np.concatenate((X, sku_enc), axis=1)
+    X = np.concatenate((X, sku_category_enc), axis=1)
+    X = np.concatenate((X, eb_flag_enc), axis=1)
+    X = np.concatenate((X, rfq_type_enc), axis=1)
+    X = np.concatenate((X, list_price_norm), axis=1)
+    X = np.concatenate((X, rfq_price_norm), axis=1)
+    print(X.shape)
 
     # split into train&cv and test sets
     test_size = 0.3
@@ -236,3 +225,6 @@ def preprocess():
     print('\nPREPROCESSING COMPLETE\nTime elapsed: {:.2f} {}'.format((end - start), 'seconds'))
 
     return X_train, X_cv, X_test, y_train, y_cv, y_test
+
+
+# preprocess()

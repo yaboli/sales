@@ -1,6 +1,6 @@
 import numpy as np
 from keras.utils import np_utils
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers.core import Dense, Dropout, Activation
 from keras import initializers, optimizers, regularizers
 from keras.layers.normalization import BatchNormalization
@@ -14,7 +14,7 @@ import shutil
 np.random.seed(7)
 
 # Delete old tensorboard data
-directory = 'C:/Users/Think/AnacondaProjects/tmp/sales'
+directory = 'C:/Users/Think/AnacondaProjects/tmp/sales/cascaded'
 path = Path(directory)
 if path.is_dir():
     shutil.rmtree(directory)
@@ -31,9 +31,18 @@ learning_rate = 0.0001
 batch_size = 100
 epochs = 25
 drop_prob = 0.5
-# beta = 0.01
-beta = 0.001
+beta = 0.01
 epsilon = 0.001
+
+# Use previously trained ANN models to predict first
+ann1 = load_model('model_ann.h5')
+ann2 = load_model('model_ann_2.h5')
+input_1_train = ann1.predict(X_train, verbose=0)
+input_2_train = ann2.predict(X_train, verbose=0)
+X_train = np.concatenate((input_1_train, input_2_train), axis=1)
+input_1_cv = ann1.predict(X_cv, verbose=0)
+input_2_cv = ann2.predict(X_cv, verbose=0)
+X_cv = np.concatenate((input_1_cv, input_2_cv), axis=1)
 
 # Network Parameters
 input_dim = X_train.shape[1]  # number of features
@@ -108,7 +117,7 @@ model.compile(loss='binary_crossentropy',
                                         epsilon=epsilon),
               metrics=['accuracy'])
 # create tensorboard object
-tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/logs', histogram_freq=0,
+tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/cascaded/logs', histogram_freq=0,
                                           write_graph=True, write_images=True)
 # train compiled cascaded
 model.fit(X_train, y_train,
@@ -126,8 +135,7 @@ print('Train accuracy: {:.6f}'.format(score_train[1]))
 print('Validation score: {:.6f}'.format(score_cv[0]))
 print('Validation accuracy: {:.6f}'.format(score_cv[1]))
 # save trained cascaded
-# cascaded.save('model_ann.h5')
-model.save('model_ann_2.h5')
+model.save('model_cascaded.h5')
 # stop timer
 end = time.time()
 print('\nTotal time : {:.2f} {}'.format((end - start) / 60, 'minutes'))
