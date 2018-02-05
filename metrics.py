@@ -18,6 +18,10 @@ n_classes = y_test_enc.shape[1]
 # model = load_model('model_ann.h5')
 # model = load_model('model_cnn.h5')
 model = load_model('model_cnn_2.h5')
+y_test_enc = np_utils.to_categorical(y_test)
+n_classes = y_test_enc.shape[1]
+
+model = load_model('model_ann.h5')
 predictions = model.predict(X_test, verbose=0)
 y_pred = [0 if x[0] >= 0.5 else 1 for x in predictions]
 y_pred_prob = model.predict_proba(X_test, verbose=0)

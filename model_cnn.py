@@ -2,13 +2,14 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Activation
 from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import Conv1D, MaxPooling1D, Conv2D, MaxPooling2D
+from keras.layers.convolutional import Conv2D, MaxPooling2D
 from keras import initializers, optimizers, regularizers
 from keras.utils import np_utils
 import keras.callbacks
 from preprocessing import preprocess
 import time
 # from pathlib import Path
+from pathlib import Path
 import shutil
 
 np.random.seed(7)
@@ -18,6 +19,11 @@ np.random.seed(7)
 # path = Path(directory)
 # if path.is_dir():
 #     shutil.rmtree(directory)
+# Delete old tensorboard data
+directory = 'C:/Users/Think/AnacondaProjects/tmp/sales/cnn'
+path = Path(directory)
+if path.is_dir():
+    shutil.rmtree(directory)
 
 # start timer
 start = time.time()
@@ -25,6 +31,9 @@ start = time.time()
 X_train, X_cv, _, y_train, y_cv, _ = preprocess()
 X_train = np.expand_dims(X_train, -1)
 X_cv = np.expand_dims(X_cv, -1)
+
+X_train = X_train.reshape(X_train.shape[0], 32, 32, 1)
+X_cv = X_cv.reshape(X_cv.shape[0], 32, 32, 1)
 y_train = np_utils.to_categorical(y_train)
 y_cv = np_utils.to_categorical(y_cv)
 
@@ -78,7 +87,19 @@ model.add(Dense(num_classes,
                 kernel_initializer='normal'))
 model.add(BatchNormalization())
 model.add(Activation('sigmoid'))
-# Compile model
+
+
+# Define cascaded architecture
+model = Sequential()
+model.add(Conv2D(32, kernel_size=(5, 5), strides=(1, 1), activation='relu', input_shape=(32, 32, 1)))
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+model.add(Conv2D(32, (3, 3), activation='relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Flatten())
+# fully connected layer
+model.add(Dense(1000, activation='relu'))
+model.add(Dense(num_classes, activation='softmax'))
+# Compile cascaded
 model.compile(loss='binary_crossentropy',
               optimizer=optimizers.adam(lr=learning_rate,
                                         beta_1=0.9,
@@ -89,14 +110,14 @@ model.compile(loss='binary_crossentropy',
 # # create tensorboard object
 # tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/cnn/logs', histogram_freq=0,
 #                                           write_graph=True, write_images=True)
+# create tensorboard object
+tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/cnn/logs', histogram_freq=0,
+                                          write_graph=True, write_images=True)
 
 # Fit cascaded on training data
 model.fit(X_train, y_train,
           batch_size=batch_size,
           epochs=epochs,
-          # validation_data=(X_cv, y_cv),
-          # shuffle=True,
-          # callbacks=[tensorboard]
           )
 
 # Evaluate model

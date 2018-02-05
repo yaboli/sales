@@ -9,6 +9,7 @@ from preprocessing import preprocess
 from sklearn import metrics
 import time
 # from pathlib import Path
+from pathlib import Path
 import shutil
 
 np.random.seed(7)
@@ -18,6 +19,11 @@ np.random.seed(7)
 # path = Path(directory)
 # if path.is_dir():
 #     shutil.rmtree(directory)
+# Delete old tensorboard data
+directory = 'C:/Users/Think/AnacondaProjects/tmp/sales/cascaded'
+path = Path(directory)
+if path.is_dir():
+    shutil.rmtree(directory)
 
 # start timer
 start = time.time()
@@ -37,6 +43,8 @@ epsilon = 0.001
 # Use previously trained ANN models to predict first
 ann1 = load_model('keras_model_data/model_ann.h5')
 ann2 = load_model('keras_model_data/model_ann_2.h5')
+ann1 = load_model('model_ann.h5')
+ann2 = load_model('model_ann_2.h5')
 input_1_train = ann1.predict(X_train, verbose=0)
 input_2_train = ann2.predict(X_train, verbose=0)
 X_train = np.concatenate((input_1_train, input_2_train), axis=1)
@@ -119,6 +127,9 @@ model.compile(loss='binary_crossentropy',
 # # create tensorboard object
 # tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/cascaded/logs', histogram_freq=0,
 #                                           write_graph=True, write_images=True)
+# create tensorboard object
+tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/cascaded/logs', histogram_freq=0,
+                                          write_graph=True, write_images=True)
 # train compiled cascaded
 model.fit(X_train, y_train,
           batch_size=batch_size,
@@ -127,6 +138,7 @@ model.fit(X_train, y_train,
           # shuffle=True,
           # callbacks=[tensorboard]
           )
+
 # Print results
 score_train = model.evaluate(X_train, y_train, verbose=0)
 score_cv = model.evaluate(X_cv, y_cv, verbose=0)

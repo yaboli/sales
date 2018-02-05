@@ -8,7 +8,9 @@ import keras.callbacks
 from preprocessing import preprocess
 from sklearn import metrics
 import time
+
 # from pathlib import Path
+from pathlib import Path
 import shutil
 
 np.random.seed(7)
@@ -18,6 +20,11 @@ np.random.seed(7)
 # path = Path(directory)
 # if path.is_dir():
 #     shutil.rmtree(directory)
+# Delete old tensorboard data
+directory = 'C:/Users/Think/AnacondaProjects/tmp/sales'
+path = Path(directory)
+if path.is_dir():
+    shutil.rmtree(directory)
 
 # start timer
 start = time.time()
@@ -107,9 +114,13 @@ model.compile(loss='binary_crossentropy',
                                         beta_2=0.999,
                                         epsilon=epsilon),
               metrics=['accuracy'])
+
 # # create tensorboard object
 # tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/logs', histogram_freq=0,
 #                                           write_graph=True, write_images=True)
+# create tensorboard object
+tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/logs', histogram_freq=0,
+                                          write_graph=True, write_images=True)
 # train compiled cascaded
 model.fit(X_train, y_train,
           batch_size=batch_size,
@@ -127,8 +138,13 @@ print('Train accuracy: {:.6f}'.format(score_train[1]))
 print('Validation score: {:.6f}'.format(score_cv[0]))
 print('Validation accuracy: {:.6f}'.format(score_cv[1]))
 # save trained cascaded
+
 # cascaded.save('keras_model_data/model_ann.h5')
 model.save('keras_model_data/model_ann_2.h5')
+
+# cascaded.save('model_ann.h5')
+model.save('model_ann_2.h5')
+
 # stop timer
 end = time.time()
 print('\nTotal time : {:.2f} {}'.format((end - start) / 60, 'minutes'))
