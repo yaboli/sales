@@ -6,7 +6,6 @@ from keras import initializers, optimizers, regularizers
 from keras.layers.normalization import BatchNormalization
 import keras.callbacks
 from preprocessing import preprocess
-from sklearn import metrics
 import time
 
 # from pathlib import Path
@@ -15,16 +14,15 @@ import shutil
 
 np.random.seed(7)
 
-# # Delete old tensorboard data
-# directory = 'C:/Users/Think/AnacondaProjects/tmp/sales'
-# path = Path(directory)
-# if path.is_dir():
-#     shutil.rmtree(directory)
-# Delete old tensorboard data
-directory = 'C:/Users/Think/AnacondaProjects/tmp/sales'
-path = Path(directory)
-if path.is_dir():
-    shutil.rmtree(directory)
+# Delete old data and event summaries
+dir1 = 'keras_model_data/ann/'
+path1 = Path(dir1)
+dir2 = 'tensorboard/ann_keras/'
+path2 = Path(dir2)
+if path1.is_dir():
+    shutil.rmtree(dir1)
+if path2.is_dir():
+    shutil.rmtree(dir2)
 
 # start timer
 start = time.time()
@@ -115,11 +113,8 @@ model.compile(loss='binary_crossentropy',
                                         epsilon=epsilon),
               metrics=['accuracy'])
 
-# # create tensorboard object
-# tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/logs', histogram_freq=0,
-#                                           write_graph=True, write_images=True)
 # create tensorboard object
-tensorboard = keras.callbacks.TensorBoard(log_dir='C:/Users/Think/AnacondaProjects/tmp/sales/logs', histogram_freq=0,
+tensorboard = keras.callbacks.TensorBoard(log_dir='tensorboard/ann_keras/', histogram_freq=0,
                                           write_graph=True, write_images=True)
 # train compiled cascaded
 model.fit(X_train, y_train,
@@ -129,6 +124,7 @@ model.fit(X_train, y_train,
           # shuffle=True,
           # callbacks=[tensorboard]
           )
+
 # Print results
 score_train = model.evaluate(X_train, y_train, verbose=0)
 score_cv = model.evaluate(X_cv, y_cv, verbose=0)
@@ -137,13 +133,10 @@ print('Train score: {:.6f}'.format(score_train[0]))
 print('Train accuracy: {:.6f}'.format(score_train[1]))
 print('Validation score: {:.6f}'.format(score_cv[0]))
 print('Validation accuracy: {:.6f}'.format(score_cv[1]))
-# save trained cascaded
 
+# save trained cascaded
 # cascaded.save('keras_model_data/model_ann.h5')
 model.save('keras_model_data/model_ann_2.h5')
-
-# cascaded.save('model_ann.h5')
-model.save('model_ann_2.h5')
 
 # stop timer
 end = time.time()

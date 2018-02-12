@@ -31,7 +31,7 @@ y_train = np_utils.to_categorical(data_batch_1['labels'])
 data_size = X_train.shape[0]
 
 # Training Parameters
-learning_rate = 0.0001
+lr_max = 0.003
 beta1 = 0.9
 beta2 = 0.999
 alpha = 0.15
@@ -44,7 +44,7 @@ X_batches = np.array_split(X_train, total_batch)
 Y_batches = np.array_split(y_train, total_batch)
 
 # Training & displaying steps
-num_steps = 100
+num_steps = 300
 display_step = 1
 
 # Network Parameters
@@ -55,12 +55,17 @@ num_classes = y_train.shape[1]  # CIFAR-10 total classes (0-9 digits)
 X = tf.placeholder(tf.float32, [None, num_input], name='data')
 Y = tf.placeholder(tf.float32, [None, num_classes], name='labels')
 keep_prob = tf.placeholder(tf.float32, name='dropout')  # dropout (keep probability)
+learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
 
 # Create some wrappers for simplicity
 def gaussian_noise_layer(x, std):
     noise = np.random.normal(0.0, std, (x.shape[0], x.shape[1]))
     return x + noise
+
+
+def gaussian(amplitude, scale, t, scope):
+    return amplitude * np.exp(-scale * (1 - t / scope) ** 2)
 
 
 def leaky_relu(x, alpha):
@@ -183,7 +188,7 @@ def l2_regularization(W, B):
 # Define loss and optimizer
 loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits,
                                                                  labels=Y))
-# loss_op = tf.reduce_mean(loss_op + beta * l2_regularization(weights, biases))
+loss_op = tf.reduce_mean(loss_op + beta * l2_regularization(weights, biases))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
                                    beta1=beta1,
                                    beta2=beta2)
@@ -207,11 +212,22 @@ with tf.Session() as sess:
     # Run the initializer
     sess.run(init)
 
+    # Initialize learning_rate
+    lr = 0.
+
     for step in range(1, num_steps + 1):
 
         # Reset loss and accuracy for current training step
         avg_loss = 0.
         avg_acc = 0.
+
+        # Ramp up or down learning rate
+        if step <= 80:
+            lr = gaussian(lr_max, 5, step, 80)
+        elif step > 250:
+            lr = gaussian(lr_max, 12.5, step - 200, 50)
+        else:
+            lr = lr_max
 
         # Loop over all batches
         for i in range(total_batch):
@@ -221,7 +237,8 @@ with tf.Session() as sess:
             # Run optimization op (backprop), loss op and accuracy op
             _, loss, acc = sess.run([train_op, loss_op, accuracy], feed_dict={X: batch_x,
                                                                               Y: batch_y,
-                                                                              keep_prob: 0.5})
+                                                                              keep_prob: 0.5,
+                                                                              learning_rate: lr})
             # Compute average loss and accuracy
             avg_loss += loss / total_batch
             avg_acc += acc / total_batch

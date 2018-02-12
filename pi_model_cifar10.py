@@ -4,11 +4,12 @@ from keras.utils import np_utils
 from pathlib import Path
 import shutil
 import cPickle
+import random
 
 # Delete old data and event summaries
-dir1 = 'tf_model_data/pi_model/'
+dir1 = 'tf_model_data/pi_model_cifar10/'
 path1 = Path(dir1)
-dir2 = 'tensorboard/pi_model/'
+dir2 = 'tensorboard/pi_model_cifar10/'
 path2 = Path(dir2)
 if path1.is_dir():
     shutil.rmtree(dir1)
@@ -28,11 +29,9 @@ data_batch_1 = unpickle(file1)
 X_train = np.array(data_batch_1['data'], dtype=np.float32)
 y_train = np_utils.to_categorical(data_batch_1['labels'])
 
-# Network Parameters
-num_input = X_train.shape[1]  # CIFAR-10 data input (img shape: 32*32*3)
-num_classes = y_train.shape[1]  # CIFAR-10 total classes (0-9 digits)
-
 # Training Parameters
+lr_max = 0.003
+w_max = 100
 beta1 = 0.9
 beta2 = 0.999
 alpha = 0.15
@@ -45,19 +44,22 @@ X_batches = np.array_split(X_train, total_batch)
 Y_batches = np.array_split(y_train, total_batch)
 
 # Training & displaying steps
-num_steps = 10
+num_steps = 300
 display_step = 1
 
-
-tf.reset_default_graph()
+# Network Parameters
+num_input = X_train.shape[1]  # CIFAR-10 data input (img shape: 32*32*3)
+num_classes = y_train.shape[1]  # CIFAR-10 total classes (0-9 digits)
 
 # tf Graph input
 X = tf.placeholder(tf.float32, [None, num_input], name='data')
 Y = tf.placeholder(tf.float32, [None, num_classes], name='labels')
 keep_prob = tf.placeholder(tf.float32, name='dropout')  # dropout (keep probability)
 learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+weight_t = tf.placeholder(tf.float32, name='weight_t')
 
 
+# Create some wrappers for simplicity
 def gaussian_noise_layer(x, std):
     noise = np.random.normal(0.0, std, (x.shape[0], x.shape[1]))
     return x + noise
@@ -65,6 +67,21 @@ def gaussian_noise_layer(x, std):
 
 def gaussian(amplitude, scale, t, scope):
     return amplitude * np.exp(-scale * (1 - t / scope) ** 2)
+
+
+def random_translate(images):
+    # randomly generate an operation flag
+    flag = random.randrange(0, 3)
+    if flag == 0:
+        return tf.map_fn(lambda img: tf.image.random_flip_left_right(img), images)
+    elif flag == 1:
+        return tf.map_fn(lambda img: tf.image.random_flip_up_down(img), images)
+    else:
+        return tf.map_fn(lambda img: tf.image.rot90(img), images)
+
+
+def leaky_relu(x, alpha):
+    return tf.nn.relu(x) - alpha * tf.nn.relu(-x)
 
 
 def batch_norm(x, epsilon=0.001):
@@ -75,10 +92,6 @@ def batch_norm(x, epsilon=0.001):
     scale = tf.Variable(tf.ones([shape[last]]))
     offset = tf.Variable(tf.zeros([shape[last]]))
     return tf.nn.batch_normalization(x, mean, var, offset, scale, epsilon)
-
-
-def leaky_relu(x, alpha):
-    return tf.nn.relu(x) - alpha * tf.nn.relu(-x)
 
 
 def conv2d(x, W, b, strides=1, padding='SAME'):
@@ -100,6 +113,9 @@ def conv_net(x, weights, biases, dropout):
     # Reshape to match picture format [Height x Width x Channel]
     # Tensor input become 4-D: [Batch Size, Height, Width, Channel]
     x = tf.reshape(x, shape=[-1, 32, 32, 3])
+
+    # Apply random translation to input tensor
+    x = random_translate(x)
 
     # Convolution Layer 1
     conv1a = batch_norm(conv2d(x, weights['wc1a'], biases['bc1a']))
@@ -129,84 +145,83 @@ def conv_net(x, weights, biases, dropout):
     return out
 
 
+# Initialize stddev of filter weights (Ref. "He et al. 2015")
+def init_stddev(filter_size, num_filters):
+    return (2 / (filter_size ** 2 * num_filters)) ** 0.5
+
 # Store layers weight & bias
 weights = {
     # 3x3 conv, 3 inputs, 128 outputs
-    'wc1a': tf.get_variable("wc1a", shape=[3, 3, 3, 128]),
+    'wc1a': tf.Variable(tf.random_normal([3, 3, 3, 128], mean=0.0, stddev=init_stddev(3, 128)), name='wc1a'),
     # 3x3 conv, 128 inputs, 128 outputs
-    'wc1b': tf.get_variable("wc1b", shape=[3, 3, 128, 128]),
+    'wc1b': tf.Variable(tf.random_normal([3, 3, 128, 128], mean=0.0, stddev=init_stddev(3, 128)), name='wc1b'),
     # 3x3 conv, 128 inputs, 128 outputs
-    'wc1c': tf.get_variable("wc1c", shape=[3, 3, 128, 128]),
+    'wc1c': tf.Variable(tf.random_normal([3, 3, 128, 128], mean=0.0, stddev=init_stddev(3, 128)), name='wc1c'),
     # 3x3 conv, 128 inputs, 256 outputs
-    'wc2a': tf.get_variable("wc2a", shape=[3, 3, 128, 256]),
+    'wc2a': tf.Variable(tf.random_normal([3, 3, 128, 256], mean=0.0, stddev=init_stddev(3, 256)), name='wc2a'),
     # 3x3 conv, 128 inputs, 256 outputs
-    'wc2b': tf.get_variable("wc2b", shape=[3, 3, 256, 256]),
+    'wc2b': tf.Variable(tf.random_normal([3, 3, 256, 256], mean=0.0, stddev=init_stddev(3, 256)), name='wc2b'),
     # 3x3 conv, 128 inputs, 256 outputs
-    'wc2c': tf.get_variable("wc2c", shape=[3, 3, 256, 256]),
+    'wc2c': tf.Variable(tf.random_normal([3, 3, 256, 256], mean=0.0, stddev=init_stddev(3, 256)), name='wc2c'),
     # 3x3 conv, 256 inputs, 512 outputs
-    'wc3a': tf.get_variable("wc3a", shape=[3, 3, 256, 512]),
+    'wc3a': tf.Variable(tf.random_normal([3, 3, 256, 512], mean=0.0, stddev=init_stddev(3, 512)), name='wc3a'),
     # 1x1 conv, 512 inputs, 256 outputs
-    'wc3b': tf.get_variable("wc3b", shape=[1, 1, 512, 256]),
+    'wc3b': tf.Variable(tf.random_normal([1, 1, 512, 256], mean=0.0, stddev=init_stddev(1, 256)), name='wc3b'),
     # 1x1 conv, 256 inputs, 128 outputs
-    'wc3c': tf.get_variable("wc3c", shape=[1, 1, 256, 128]),
+    'wc3c': tf.Variable(tf.random_normal([1, 1, 256, 128], mean=0.0, stddev=init_stddev(1, 128)), name='wc3c'),
     # 1x1x128 inputs, 10 outputs (class prediction)
-    'out': tf.get_variable("w_out", shape=[1 * 1 * 128, num_classes])
+    'out': tf.Variable(tf.random_normal([1 * 1 * 128, num_classes], mean=0.0, stddev=0.01), name='w_out')
 }
 
 biases = {
-    'bc1a': tf.get_variable("bc1a", shape=[128]),
-    'bc1b': tf.get_variable("bc1b", shape=[128]),
-    'bc1c': tf.get_variable("bc1c", shape=[128]),
-    'bc2a': tf.get_variable("bc2a", shape=[256]),
-    'bc2b': tf.get_variable("bc2b", shape=[256]),
-    'bc2c': tf.get_variable("bc2c", shape=[256]),
-    'bc3a': tf.get_variable("bc3a", shape=[512]),
-    'bc3b': tf.get_variable("bc3b", shape=[256]),
-    'bc3c': tf.get_variable("bc3c", shape=[128]),
-    'out': tf.get_variable("b_out", shape=[num_classes])
+    'bc1a': tf.Variable(tf.random_normal([128]), name='bc1a'),
+    'bc1b': tf.Variable(tf.random_normal([128]), name='bc1b'),
+    'bc1c': tf.Variable(tf.random_normal([128]), name='bc1c'),
+    'bc2a': tf.Variable(tf.random_normal([256]), name='bc2a'),
+    'bc2b': tf.Variable(tf.random_normal([256]), name='bc2b'),
+    'bc2c': tf.Variable(tf.random_normal([256]), name='bc2c'),
+    'bc3a': tf.Variable(tf.random_normal([512]), name='bc3a'),
+    'bc3b': tf.Variable(tf.random_normal([256]), name='bc3b'),
+    'bc3c': tf.Variable(tf.random_normal([128]), name='bc3c'),
+    'out': tf.Variable(tf.random_normal([num_classes]), name='b_out')
 }
 
 # Construct model
-logits = conv_net(X, weights, biases, keep_prob)
-prediction = tf.nn.softmax(logits)
-
-
-# Compute l2 regularization
-def l2_regularization(W, B):
-    result = 0.
-    for w in W:
-        result += tf.nn.l2_loss(W[w])
-    for b in B:
-        result += tf.nn.l2_loss(B[b])
-    return result
+z = conv_net(X, weights, biases, keep_prob)
+z_ = conv_net(X, weights, biases, keep_prob)
 
 # Define loss and optimizer
-loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits,
+loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=z,
                                                                  labels=Y))
-loss_op = tf.reduce_mean(loss_op + beta * l2_regularization(weights, biases))
+loss_op = tf.reduce_mean(loss_op + weight_t * tf.losses.mean_squared_error(predictions=z_,
+                                                                           labels=z))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
                                    beta1=beta1,
                                    beta2=beta2)
 train_op = optimizer.minimize(loss_op)
 
 # Evaluate model
+prediction = tf.nn.softmax(z)
 correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(Y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-prev_model_path = 'tf_model_data/cnn_cifar10/cnn_cifar10.ckpt'
-new_model_path = 'tf_model_data/pi_model/pi_model.ckpt'
+model_path = 'tf_model_data/pi_model_cifar10/pi_model_cifar10.ckpt'
 
-# Add ops to restore all the variables.
+# Initialize the variables (i.e. assign their default value)
+init = tf.global_variables_initializer()
+
+# Add ops to save all the variables.
 saver = tf.train.Saver()
 
 # Start training
 with tf.Session() as sess:
 
-    # Restore variables from disk.
-    saver.restore(sess, prev_model_path)
-    print("Model restored.")
+    # Run the initializer
+    sess.run(init)
 
+    # Initialize learning_rate and weighting function
     lr = 0.
+    w_t = 0.
 
     for step in range(1, num_steps + 1):
 
@@ -214,14 +229,16 @@ with tf.Session() as sess:
         avg_loss = 0.
         avg_acc = 0.
 
-        # Ramp up or down learning rate following Gaussian distribution
-        max_learning_rate = 0.003
+        # Ramp up or down learning rate
         if step <= 80:
-            lr = gaussian(max_learning_rate, 5, step, 80)
+            lr = gaussian(lr_max, 5, step, 80)
+            w_t = gaussian(w_max, 5, step, 80)
         elif step > 250:
-            lr = gaussian(max_learning_rate, 12.5, step-200, 50)
+            lr = gaussian(lr_max, 12.5, step - 200, 50)
+            w_t = w_max
         else:
-            lr = max_learning_rate
+            lr = lr_max
+            w_t = w_max
 
         # Loop over all batches
         for i in range(total_batch):
@@ -232,7 +249,8 @@ with tf.Session() as sess:
             _, loss, acc = sess.run([train_op, loss_op, accuracy], feed_dict={X: batch_x,
                                                                               Y: batch_y,
                                                                               keep_prob: 0.5,
-                                                                              learning_rate: lr})
+                                                                              learning_rate: lr,
+                                                                              weight_t: w_t})
             # Compute average loss and accuracy
             avg_loss += loss / total_batch
             avg_acc += acc / total_batch
@@ -245,16 +263,18 @@ with tf.Session() as sess:
 
     print("Optimization Finished!")
 
-    # Save model data to new_model_path
-    save_path = saver.save(sess, new_model_path)
+    # Save model data to model_path
+    save_path = saver.save(sess, model_path)
     print("Model saved in file: %s" % save_path)
 
-    # Run accuracy op
+    # Calculate loss and accuracy for 256 CIFAR-10 test images
     file_test = 'cifar-10-batches-py/test_batch'
     test_batch = unpickle(file_test)
     X_test = np.array(test_batch['data'], dtype=np.float32)
     y_test = np_utils.to_categorical(test_batch['labels'])
-    acc = sess.run(accuracy, feed_dict={X: X_test[:256],
-                                        Y: y_test[:256],
-                                        keep_prob: 1.0})
-    print("Testing Accuracy: " + "{:.4f}".format(acc))
+    loss, acc = sess.run([loss_op, accuracy], feed_dict={X: X_test[:256],
+                                                         Y: y_test[:256],
+                                                         keep_prob: 1.0,
+                                                         weight_t: w_t})
+    print("Testing Loss: " + "{:.4f}".format(loss)
+          + ", Testing Accuracy: " + "{:.4f}".format(acc))

@@ -2,7 +2,7 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Activation
 from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import Conv2D, MaxPooling2D
+from keras.layers.convolutional import Conv1D, Conv2D, MaxPooling1D, MaxPooling2D
 from keras import initializers, optimizers, regularizers
 from keras.utils import np_utils
 import keras.callbacks
