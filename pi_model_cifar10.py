@@ -5,6 +5,9 @@ from pathlib import Path
 import shutil
 import cPickle
 import random
+import time
+
+start = time.time()
 
 # Delete old data and event summaries
 dir1 = 'tf_model_data/pi_model_cifar10/'
@@ -26,8 +29,8 @@ def unpickle(file):
 # 'data_batch_1' contains 10,000 CIFAR-10 images and their labels
 file1 = 'cifar-10-batches-py/data_batch_1'
 data_batch_1 = unpickle(file1)
-X_train = np.array(data_batch_1['data'], dtype=np.float32)
-y_train = np_utils.to_categorical(data_batch_1['labels'])
+X_train = np.array(data_batch_1['data'], dtype=np.float32)[:4000]
+y_train = np_utils.to_categorical(data_batch_1['labels'])[:4000]
 
 # Training Parameters
 lr_max = 0.003
@@ -45,7 +48,7 @@ Y_batches = np.array_split(y_train, total_batch)
 
 # Training & displaying steps
 num_steps = 300
-display_step = 1
+display_step = 15
 
 # Network Parameters
 num_input = X_train.shape[1]  # CIFAR-10 data input (img shape: 32*32*3)
@@ -114,8 +117,8 @@ def conv_net(x, weights, biases, dropout):
     # Tensor input become 4-D: [Batch Size, Height, Width, Channel]
     x = tf.reshape(x, shape=[-1, 32, 32, 3])
 
-    # Apply random translation to input tensor
-    x = random_translate(x)
+    # # Apply random translation to input tensor
+    # x = random_translate(x)
 
     # Convolution Layer 1
     conv1a = batch_norm(conv2d(x, weights['wc1a'], biases['bc1a']))
@@ -186,7 +189,7 @@ biases = {
     'out': tf.Variable(tf.random_normal([num_classes]), name='b_out')
 }
 
-# Construct model
+# Construct two parallel and identical computation graphs
 z = conv_net(X, weights, biases, keep_prob)
 z_ = conv_net(X, weights, biases, keep_prob)
 
@@ -219,7 +222,7 @@ with tf.Session() as sess:
     # Run the initializer
     sess.run(init)
 
-    # Initialize learning_rate and weighting function
+    # Initialize learning_rate and unsupervised weight
     lr = 0.
     w_t = 0.
 
@@ -229,7 +232,7 @@ with tf.Session() as sess:
         avg_loss = 0.
         avg_acc = 0.
 
-        # Ramp up or down learning rate
+        # Ramp up/down learning rate and unsupervised weight
         if step <= 80:
             lr = gaussian(lr_max, 5, step, 80)
             w_t = gaussian(w_max, 5, step, 80)
@@ -261,7 +264,10 @@ with tf.Session() as sess:
                   ", Loss=" + "{:.4f}".format(avg_loss) +
                   ", Accuracy=" + "{:.4f}".format(avg_acc))
 
-    print("Optimization Finished!")
+    # Stop timer
+    end = time.time()
+    print('\nOptimization Finished!'
+          '\nTotal training time: {:.2f} {}'.format((end - start) / 60, 'minutes'))
 
     # Save model data to model_path
     save_path = saver.save(sess, model_path)

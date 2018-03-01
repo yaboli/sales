@@ -25,6 +25,7 @@ n_hidden_1 = 512  # 1st layer number of neurons
 n_hidden_2 = 256  # 2nd layer number of neurons
 num_input = X_test.shape[1]  # number of features
 epsilon = 0.001
+keep_prob = 1
 
 tf.reset_default_graph()
 
@@ -45,21 +46,25 @@ biases = {
 }
 
 
+def batch_norm(x, epsilon=0.001):
+    shape = x.shape
+    last = len(shape) - 1
+    axis = list(range(last))
+    mean, var = tf.nn.moments(x, axis)
+    scale = tf.Variable(tf.ones([shape[last]]))
+    offset = tf.Variable(tf.zeros([shape[last]]))
+    return tf.nn.batch_normalization(x, mean, var, offset, scale, epsilon)
+
+
 def neural_net_model(x):
-    # Hidden fully connected layer with 512 neurons, Relu activation
-    z1 = tf.add(tf.matmul(x, weights['h1']), biases['b1'])
-    batch_mean_1, batch_var_1 = tf.nn.moments(z1, [0])
-    scale_bn_1 = tf.Variable(tf.ones([n_hidden_1]))
-    beta_bn_1 = tf.Variable(tf.zeros([n_hidden_1]))
-    bn1 = tf.nn.batch_normalization(z1, batch_mean_1, batch_var_1, beta_bn_1, scale_bn_1, epsilon)
-    layer_1 = tf.nn.relu(bn1)
-    # Hidden fully connected layer with 256 neurons, Relu activation
-    z2 = tf.add(tf.matmul(layer_1, weights['h2']), biases['b2'])
-    batch_mean_2, batch_var_2 = tf.nn.moments(z2, [0])
-    scale_bn_2 = tf.Variable(tf.ones([n_hidden_2]))
-    beta_bn_2 = tf.Variable(tf.zeros([n_hidden_2]))
-    bn2 = tf.nn.batch_normalization(z2, batch_mean_2, batch_var_2, beta_bn_2, scale_bn_2, epsilon)
-    layer_2 = tf.nn.relu(bn2)
+    # Hidden fully connected layer with 512 neurons, Relu activation, batch normalization and dropout
+    z1 = tf.nn.relu(tf.add(tf.matmul(x, weights['w1']), biases['b1']))
+    bn1 = batch_norm(z1)
+    layer_1 = tf.nn.dropout(bn1, keep_prob=keep_prob)
+    # Hidden fully connected layer with 256 neurons, Relu activation, batch normalization and dropout
+    z2 = tf.nn.relu(tf.add(tf.matmul(layer_1, weights['w2']), biases['b2']))
+    bn2 = batch_norm(z2)
+    layer_2 = tf.nn.dropout(bn2, keep_prob=keep_prob)
     # Output fully connected layer with 1 neuron for each class
     out_layer = tf.matmul(layer_2, weights['out']) + biases['out']
     return out_layer
